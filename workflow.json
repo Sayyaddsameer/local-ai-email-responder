@@ -1,0 +1,102 @@
+{
+  "name": "AI Email Auto-Responder",
+  "nodes": [
+    {
+      "parameters": {
+        "postProcessAction": "nothing",
+        "format": "resolved",
+        "options": {
+          "customEmailConfig": "[\"UNSEEN\"]"
+        }
+      },
+      "id": "1",
+      "name": "Email Read (IMAP)",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.subject }}",
+              "operation": "notStartsWith",
+              "value2": "Re: AI Auto-Reply:"
+            }
+          ]
+        }
+      },
+      "id": "2",
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3:8b\",\n  \"stream\": false,\n  \"prompt\": \"You are a professional and helpful email assistant. A new email has arrived.\\n\\nSender: {{ $node[\\\"Email Read (IMAP)\\\"].json.from.address }}\\nSubject: {{ $node[\\\"Email Read (IMAP)\\\"].json.subject }}\\nBody:\\n{{ $node[\\\"Email Read (IMAP)\\\"].json.text }}\\n\\nYour reply should be helpful and directly address the content of the email. Do not include a greeting or signature; provide only the body of the reply.\"\n}"
+      },
+      "id": "3",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [400, -100]
+    },
+    {
+      "parameters": {
+        "toEmail": "={{ $node[\"Email Read (IMAP)\"].json.from.address }}",
+        "subject": "=Re: AI Auto-Reply: {{ $node[\"Email Read (IMAP)\"].json.subject }}",
+        "text": "={{ $json.response }}",
+        "options": {
+          "messageId": "={{ $node[\"Email Read (IMAP)\"].json.messageId }}"
+        }
+      },
+      "id": "4",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [600, -100]
+    }
+  ],
+  "connections": {
+    "Email Read (IMAP)": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}
